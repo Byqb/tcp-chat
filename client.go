@@ -24,7 +24,6 @@ func (c *client) readInput() {
 		msg = strings.Trim(msg, "\r\n")
 
 		args := strings.Split(msg, " ")
-
 		cmd := strings.TrimSpace(args[0])
 
 		switch cmd {
@@ -44,7 +43,6 @@ func (c *client) readInput() {
 			c.commands <- command{
 				id:     CMD_ROOMS,
 				client: c,
-				args:   args,
 			}
 		case "/msg":
 			c.commands <- command{
@@ -56,16 +54,15 @@ func (c *client) readInput() {
 			c.commands <- command{
 				id:     CMD_QUIT,
 				client: c,
-				args:   args,
 			}
 		default:
-			c.err(fmt.Errorf("Unknown commands: %s", cmd))
+			c.err(fmt.Errorf("unknown command: %s", cmd))
 		}
 	}
 }
 
 func (c *client) err(err error) {
-	c.conn.Write([]byte("ERR: " + err.Error() + "\n"))
+	c.conn.Write([]byte("err: " + err.Error() + "\n"))
 }
 
 func (c *client) msg(msg string) {
