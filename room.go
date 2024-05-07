@@ -1,17 +1,18 @@
 package main
 
-import "net"
+import (
+	"net"
+)
 
 type room struct {
 	name    string
 	members map[net.Addr]*client
 }
 
-func (r *room) broadcase(sender *client, msg string) {
+func (r *room) broadcast(sender *client, msg string) {
 	for addr, m := range r.members {
-		if addr != sender.conn.RemoteAddr() {
+		if sender.conn.RemoteAddr() != addr {
 			m.msg(msg)
 		}
-
 	}
 }
