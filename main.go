@@ -10,23 +10,21 @@ func main() {
 	go s.run()
 
 	listener, err := net.Listen("tcp", ":8888")
-
 	if err != nil {
-		log.Fatal("unable to start server: %s ", err.Error())
+		log.Fatalf("unable to start server: %s", err.Error())
 	}
 
 	defer listener.Close()
-	log.Printf("Started  server on :8888")
+	log.Printf("server started on :8888")
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Fatal("unable to accept connection: %s ", err.Error())
+			log.Printf("failed to accept connection: %s", err.Error())
 			continue
 		}
 
-		go s.newClient(conn)
-
+		c := s.newClient(conn)
+		go c.readInput()
 	}
-
 }
