@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -28,33 +27,43 @@ func (s *server) run() {
 		case CMD_JOIN:
 			s.join(cmd.client, cmd.args)
 		case CMD_ROOMS:
-			s.listeRooms(cmd.client, cmd.args)
+			s.listRooms(cmd.client)
 		case CMD_MSG:
 			s.msg(cmd.client, cmd.args)
 		case CMD_QUIT:
-			s.quit(cmd.client, cmd.args)
+			s.quit(cmd.client)
 		}
 	}
 }
-func (s *server) newClient(conn net.Conn) {
-	log.Fatal("new client has connection: %s ", conn, conn.RemoteAddr().String())
 
-	c := &client{
+func (s *server) newClient(conn net.Conn) *client {
+	log.Printf("new client has joined: %s", conn.RemoteAddr().String())
+
+	return &client{
 		conn:     conn,
 		nick:     "anonymous",
 		commands: s.commands,
 	}
-
-	c.readInput()
 }
 
 func (s *server) nick(c *client, args []string) {
-	c.nick = args[1]
-	c.msg(fmt.Sprint("all right, I will call you %S", c.nick))
+	if len(args) < 2 {
+		c.msg("nick is required. usage: /nick NAME")
+		return
+	}
 
+	c.nick = args[1]
+	c.msg(fmt.Sprintf("all right, I will call you %s", c.nick))
 }
+
 func (s *server) join(c *client, args []string) {
+	if len(args) < 2 {
+		c.msg("room name is required. usage: /join ROOM_NAME")
+		return
+	}
+
 	roomName := args[1]
+
 	r, ok := s.rooms[roomName]
 	if !ok {
 		r = &room{
@@ -63,40 +72,48 @@ func (s *server) join(c *client, args []string) {
 		}
 		s.rooms[roomName] = r
 	}
-
 	r.members[c.conn.RemoteAddr()] = c
+
 	s.quitCurrentRoom(c)
 	c.room = r
 
-	r.broadcase(c, fmt.Sprintf("%S has joined the room", c.nick))
-	c.msg(fmt.Sprintf("<--- Welcome to %S --->", r.name))
+	r.broadcast(c, fmt.Sprintf("%s joined the room", c.nick))
 
+	c.msg(fmt.Sprintf("welcome to %s", roomName))
 }
-func (s *server) listeRooms(c *client, args []string) {
+
+func (s *server) listRooms(c *client) {
 	var rooms []string
 	for name := range s.rooms {
 		rooms = append(rooms, name)
-		c.msg(fmt.Sprintf("available rooms are: %S", strings.Join(rooms, ", ")))
-
 	}
+
+	c.msg(fmt.Sprintf("available rooms: %s", strings.Join(rooms, ", ")))
 }
+
 func (s *server) msg(c *client, args []string) {
-	if c.room == nil {
-		c.err(errors.New("You must join the room first :("))
+	if len(args) < 2 {
+		c.msg("message is required, usage: /msg MSG")
 		return
 	}
-	c.room.broadcase(c, c.nick+": "+strings.Join(args[1:len(args)], " "))
+
+	msg := strings.Join(args[1:], " ")
+	c.room.broadcast(c, c.nick+": "+msg)
 }
-func (s *server) quit(c *client, args []string) {
-	log.Printf("Client has Disconnected: %S", c.conn.RemoteAddr().String())
+
+func (s *server) quit(c *client) {
+	log.Printf("client has left the chat: %s", c.conn.RemoteAddr().String())
+
 	s.quitCurrentRoom(c)
-	c.msg("Sad to see you go :(")
+
+	c.msg("sad to see you go =(")
 	c.conn.Close()
 }
 
 func (s *server) quitCurrentRoom(c *client) {
 	if c.room != nil {
-		delete(c.room.members, c.conn.RemoteAddr())
-		c.room.broadcase(c, fmt.Sprintf(" %S has left the room", c.nick))
+		oldRoom := s.rooms[c.room.name]
+		delete(s.rooms[c.room.name].members, c.conn.RemoteAddr())
+		oldRoom.broadcast(c, fmt.Sprintf("%s has left the room", c.nick))
 	}
 }
